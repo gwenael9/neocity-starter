@@ -22,6 +22,7 @@ export default function PowerGrid() {
   const [showFailure, setShowFailure] = useState(false);
   const [zoneStates, setZoneStates] = useState(defaultZoneStates);
   const timersRef = useRef([]);
+  const isMountedRef = useRef(true);
 
   // Clear any running cascade timers
   const clearTimers = useCallback(() => {
@@ -30,6 +31,8 @@ export default function PowerGrid() {
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     // ─── weather:change ───────────────────────────────────
     const unsubWeather = eventBus.on("weather:change", ({ intensity }) => {
       clearTimers();
@@ -45,11 +48,16 @@ export default function PowerGrid() {
         }));
         setCityPower(34);
         setShowFailure(false);
-        eventBus.emit("power:outage", {
-          zones: ["A", "B", "D", "E"],
-          severity: "partial",
-          cityPower: 34,
-        });
+
+        if (isMountedRef.current) {
+          queueMicrotask(() => {
+            eventBus.emit("power:outage", {
+              zones: ["A", "B", "D", "E"],
+              severity: "partial",
+              cityPower: 34,
+            });
+          })
+        }
       } else if (intensity >= 50) {
         // B,D → orange
         setZoneStates((prev) => ({
@@ -61,14 +69,19 @@ export default function PowerGrid() {
         }));
         setCityPower(72);
         setShowFailure(false);
-        eventBus.emit("power:outage", {
-          zones: ["B", "D"],
-          severity: "partial",
-          cityPower: 72,
-        });
+
+        if (isMountedRef.current) {
+          queueMicrotask(() => {
+            eventBus.emit("power:outage", {
+              zones: ["B", "D"],
+              severity: "partial",
+              cityPower: 72,
+            });
+          })
+        }
       } else {
         // Below 50 → everything back to normal
-        setZoneStates(defaultZoneStates());
+        setZoneStates(defaultZoneStates);
         setCityPower(100);
         setShowFailure(false);
       }
@@ -114,9 +127,10 @@ export default function PowerGrid() {
     });
 
     return () => {
+      isMountedRef.current = false;
+      clearTimers();
       unsubWeather();
       unsubHacker();
-      clearTimers();
     };
   }, [clearTimers]);
 
