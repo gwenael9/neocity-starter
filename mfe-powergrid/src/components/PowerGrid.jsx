@@ -56,7 +56,7 @@ export default function PowerGrid() {
               severity: "partial",
               cityPower: 34,
             });
-          })
+          });
         }
       } else if (intensity >= 50) {
         // B,D → orange
@@ -77,7 +77,7 @@ export default function PowerGrid() {
               severity: "partial",
               cityPower: 72,
             });
-          })
+          });
         }
       } else {
         // Below 50 → everything back to normal
@@ -95,11 +95,23 @@ export default function PowerGrid() {
         // Cascade noir A → F, 300 ms entre chaque
         ZONE_IDS.forEach((id, i) => {
           const t = setTimeout(() => {
+            if (!isMountedRef.current) return;
+
             setZoneStates((prev) => ({ ...prev, [id]: "black" }));
             // After last zone goes black
             if (i === ZONE_IDS.length - 1) {
               setCityPower(0);
               setShowFailure(true);
+
+              if (isMountedRef.current) {
+                queueMicrotask(() => {
+                  eventBus.emit("power:outage", {
+                    zones: ZONE_IDS,
+                    severity: "total",
+                    cityPower: 0,
+                  });
+                });
+              }
             }
           }, i * 300);
           timersRef.current.push(t);
@@ -114,6 +126,8 @@ export default function PowerGrid() {
         const reversed = [...ZONE_IDS].reverse();
         reversed.forEach((id, i) => {
           const t = setTimeout(() => {
+            if (!isMountedRef.current) return;
+
             setZoneStates((prev) => ({ ...prev, [id]: "online" }));
             // After last zone (A) is back online
             if (i === reversed.length - 1) {
